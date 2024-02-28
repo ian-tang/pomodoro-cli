@@ -211,7 +211,7 @@ func (t PausedTimerState) resetCurrentTimer() TimerState {
 }
 
 func (t Timer) getNextTimerType() (int, int) {
-	if t.timerType == FOCUS_TIMER && t.pomodoroCount == 0 {
+	if t.timerType == FOCUS_TIMER && t.pomodoroCount%4 == 0 {
 		return LONG_BREAK_TIMER, TimerDuration[LONG_BREAK_TIMER]
 	}
 
