@@ -15,7 +15,7 @@ var TimerDuration = map[int]int{
 }
 
 type TimerState interface {
-	Tick()
+	Tick() TimerState
 	NextTimer() TimerState
 	Pause() TimerState
 	SkipCurrentTimer() TimerState
@@ -37,10 +37,15 @@ type PausedTimerState struct {
 	Timer
 }
 
-func (t RunningTimerState) Tick() {
+func (t RunningTimerState) Tick() TimerState {
 	t.TimeRemaining--
+
 	if t.TimeRemaining <= 0 {
-		t.NextTimer()
+		return t.NextTimer()
+	}
+
+	return RunningTimerState{
+		t.Timer,
 	}
 }
 
@@ -81,7 +86,9 @@ func (t RunningTimerState) GetFormattedTimeString() string {
 	return fmt.Sprintf("%2d:%02d", t.TimeRemaining/60, t.TimeRemaining%60)
 }
 
-func (t PausedTimerState) Tick() {}
+func (t PausedTimerState) Tick() TimerState {
+	return t
+}
 
 func (t PausedTimerState) NextTimer() TimerState {
 	timerType, timerDuration, pomodoroCount := t.getNextTimerType()
