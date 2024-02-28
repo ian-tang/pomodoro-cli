@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/ian-tang/pomodoro-cli/cmd/timer"
+
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -27,19 +29,18 @@ to quickly create a Cobra application.`,
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
-const (
-	WORK_TIMER        = 25 * 60
-	SHORT_BREAK_TIMER = 5 * 60
-	LONG_BREAK_TIMER  = 15 * 60
-)
+var initialTimerState = timer.PausedTimerState{
+	Timer: timer.Timer{
+		TimerType:     timer.FOCUS_TIMER,
+		TimeRemaining: timer.TimerDuration[timer.FOCUS_TIMER],
+		PomodoroCount: 0,
+	},
+}
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	activeTimer := WORK_TIMER
-
-	ticker := time.NewTicker(time.Second)
 
 	if err != nil {
 		fmt.Printf("Error setting raw terminal: %v\n", err)
@@ -48,34 +49,26 @@ func Execute() {
 
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
+	timerState := timer.TimerState(initialTimerState)
+	ticker := time.NewTicker(time.Second)
+
 	input := make(chan byte)
 
 	go func() {
-		paused := true
 		var formattedTime string
 
-		for _, ok := <-input; ok; fmt.Print("\r\x1B[0K") {
-			formattedTime = fmt.Sprintf("%2d:%02d", activeTimer/60, activeTimer%60)
+		for ; ; fmt.Print("\r\x1B[0K") {
+			formattedTime = timerState.GetFormattedTimeString()
 			fmt.Print("\r\x1B[0K", formattedTime)
-			if paused {
-				fmt.Print("    (paused)")
-			}
 
 			select {
 			case <-input:
-				paused = !paused
+				timerState = timerState.Pause()
 			case <-ticker.C:
-				if !paused {
-					activeTimer -= 1
-					if activeTimer == 0 {
-						ticker.Stop()
-					}
-				}
+				timerState = timerState.Tick()
 			}
 		}
 	}()
-
-	input <- 's' // display the timer right away, without user input
 
 	var buf [1]byte
 
