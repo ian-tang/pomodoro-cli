@@ -21,9 +21,9 @@ type TimerState interface {
 }
 
 type Timer struct {
-	timerType     int
-	timeRemaining int
-	pomodoroCount int
+	TimerType     int
+	TimeRemaining int
+	PomodoroCount int
 }
 
 type FocusTimerState struct {
@@ -43,8 +43,8 @@ type PausedTimerState struct {
 }
 
 func (t FocusTimerState) tick() {
-	t.timeRemaining--
-	if t.timeRemaining <= 0 {
+	t.TimeRemaining--
+	if t.TimeRemaining <= 0 {
 		t.nextTimer()
 	}
 }
@@ -54,9 +54,9 @@ func (t FocusTimerState) nextTimer() TimerState {
 
 	return PausedTimerState{
 		Timer{
-			timerType:     timerType,
-			timeRemaining: timerDuration,
-			pomodoroCount: t.pomodoroCount,
+			TimerType:     timerType,
+			TimeRemaining: timerDuration,
+			PomodoroCount: t.PomodoroCount,
 		},
 	}
 }
@@ -72,16 +72,16 @@ func (t FocusTimerState) skipCurrentTimer() TimerState {
 func (t Timer) resetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
-			timerType:     t.timerType,
-			timeRemaining: TimerDuration[t.timerType],
-			pomodoroCount: t.pomodoroCount,
+			TimerType:     t.TimerType,
+			TimeRemaining: TimerDuration[t.TimerType],
+			PomodoroCount: t.PomodoroCount,
 		},
 	}
 }
 
 func (t ShortBreakTimerState) tick() {
-	t.timeRemaining--
-	if t.timeRemaining <= 0 {
+	t.TimeRemaining--
+	if t.TimeRemaining <= 0 {
 		t.nextTimer()
 	}
 }
@@ -91,9 +91,9 @@ func (t ShortBreakTimerState) nextTimer() TimerState {
 
 	return PausedTimerState{
 		Timer{
-			timerType:     timerType,
-			timeRemaining: timerDuration,
-			pomodoroCount: t.pomodoroCount + 1,
+			TimerType:     timerType,
+			TimeRemaining: timerDuration,
+			PomodoroCount: t.PomodoroCount + 1,
 		},
 	}
 }
@@ -107,9 +107,9 @@ func (t ShortBreakTimerState) skipCurrentTimer() TimerState {
 
 	return PausedTimerState{
 		Timer{
-			timerType:     timerType,
-			timeRemaining: timerDuration,
-			pomodoroCount: t.pomodoroCount + 1,
+			TimerType:     timerType,
+			TimeRemaining: timerDuration,
+			PomodoroCount: t.PomodoroCount + 1,
 		},
 	}
 }
@@ -117,16 +117,16 @@ func (t ShortBreakTimerState) skipCurrentTimer() TimerState {
 func (t ShortBreakTimerState) resetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
-			timerType:     t.timerType,
-			timeRemaining: TimerDuration[t.timerType],
-			pomodoroCount: t.pomodoroCount,
+			TimerType:     t.TimerType,
+			TimeRemaining: TimerDuration[t.TimerType],
+			PomodoroCount: t.PomodoroCount,
 		},
 	}
 }
 
 func (t LongBreakTimerState) tick() {
-	t.timeRemaining--
-	if t.timeRemaining <= 0 {
+	t.TimeRemaining--
+	if t.TimeRemaining <= 0 {
 		t.nextTimer()
 	}
 }
@@ -136,9 +136,9 @@ func (t LongBreakTimerState) nextTimer() TimerState {
 
 	return PausedTimerState{
 		Timer{
-			timerType:     timerType,
-			timeRemaining: timerDuration,
-			pomodoroCount: t.pomodoroCount + 1,
+			TimerType:     timerType,
+			TimeRemaining: timerDuration,
+			PomodoroCount: t.PomodoroCount + 1,
 		},
 	}
 }
@@ -152,9 +152,9 @@ func (t LongBreakTimerState) skipCurrentTimer() TimerState {
 
 	return PausedTimerState{
 		Timer{
-			timerType:     timerType,
-			timeRemaining: timerDuration,
-			pomodoroCount: t.pomodoroCount + 1,
+			TimerType:     timerType,
+			TimeRemaining: timerDuration,
+			PomodoroCount: t.PomodoroCount + 1,
 		},
 	}
 }
@@ -162,9 +162,9 @@ func (t LongBreakTimerState) skipCurrentTimer() TimerState {
 func (t LongBreakTimerState) resetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
-			timerType:     t.timerType,
-			timeRemaining: TimerDuration[t.timerType],
-			pomodoroCount: t.pomodoroCount,
+			TimerType:     t.TimerType,
+			TimeRemaining: TimerDuration[t.TimerType],
+			PomodoroCount: t.PomodoroCount,
 		},
 	}
 }
@@ -172,19 +172,19 @@ func (t LongBreakTimerState) resetCurrentTimer() TimerState {
 func (t PausedTimerState) tick() {}
 
 func (t PausedTimerState) nextTimer() TimerState {
-	timerType, timerDuration := t.getNextTimerType()
+	TimerType, timerDuration := t.getNextTimerType()
 
 	return PausedTimerState{
 		Timer{
-			timerType:     timerType,
-			timeRemaining: timerDuration,
-			pomodoroCount: t.pomodoroCount + 1,
+			TimerType:     TimerType,
+			TimeRemaining: timerDuration,
+			PomodoroCount: t.PomodoroCount + 1,
 		},
 	}
 }
 
 func (t PausedTimerState) pause() TimerState {
-	switch t.timerType {
+	switch t.TimerType {
 	case FOCUS_TIMER:
 		return FocusTimerState(t)
 	case SHORT_BREAK_TIMER:
@@ -203,19 +203,19 @@ func (t PausedTimerState) skipCurrentTimer() TimerState {
 func (t PausedTimerState) resetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
-			timerType:     t.timerType,
-			timeRemaining: TimerDuration[t.timerType],
-			pomodoroCount: t.pomodoroCount,
+			TimerType:     t.TimerType,
+			TimeRemaining: TimerDuration[t.TimerType],
+			PomodoroCount: t.PomodoroCount,
 		},
 	}
 }
 
 func (t Timer) getNextTimerType() (int, int) {
-	if t.timerType == FOCUS_TIMER && t.pomodoroCount%4 == 0 {
+	if t.TimerType == FOCUS_TIMER && t.PomodoroCount%4 == 0 {
 		return LONG_BREAK_TIMER, TimerDuration[LONG_BREAK_TIMER]
 	}
 
-	if t.timerType == FOCUS_TIMER {
+	if t.TimerType == FOCUS_TIMER {
 		return SHORT_BREAK_TIMER, TimerDuration[SHORT_BREAK_TIMER]
 	}
 
