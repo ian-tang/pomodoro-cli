@@ -15,12 +15,12 @@ var TimerDuration = map[int]int{
 }
 
 type TimerState interface {
-	tick()
-	nextTimer() TimerState
-	pause() TimerState
-	skipCurrentTimer() TimerState
-	resetCurrentTimer() TimerState
-	getFormattedTimeString() string
+	Tick()
+	NextTimer() TimerState
+	Pause() TimerState
+	SkipCurrentTimer() TimerState
+	ResetCurrentTimer() TimerState
+	GetFormattedTimeString() string
 }
 
 type Timer struct {
@@ -37,14 +37,14 @@ type PausedTimerState struct {
 	Timer
 }
 
-func (t RunningTimerState) tick() {
+func (t RunningTimerState) Tick() {
 	t.TimeRemaining--
 	if t.TimeRemaining <= 0 {
-		t.nextTimer()
+		t.NextTimer()
 	}
 }
 
-func (t RunningTimerState) nextTimer() TimerState {
+func (t RunningTimerState) NextTimer() TimerState {
 	timerType, timerDuration, pomodoroCount := t.getNextTimerType()
 	if timerType == SHORT_BREAK_TIMER || timerType == LONG_BREAK_TIMER {
 		t.PomodoroCount++
@@ -59,15 +59,15 @@ func (t RunningTimerState) nextTimer() TimerState {
 	}
 }
 
-func (t RunningTimerState) pause() TimerState {
+func (t RunningTimerState) Pause() TimerState {
 	return PausedTimerState(t)
 }
 
-func (t RunningTimerState) skipCurrentTimer() TimerState {
-	return t.nextTimer()
+func (t RunningTimerState) SkipCurrentTimer() TimerState {
+	return t.NextTimer()
 }
 
-func (t RunningTimerState) resetCurrentTimer() TimerState {
+func (t RunningTimerState) ResetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
 			TimerType:     t.TimerType,
@@ -77,13 +77,13 @@ func (t RunningTimerState) resetCurrentTimer() TimerState {
 	}
 }
 
-func (t RunningTimerState) getFormattedTimeString() string {
+func (t RunningTimerState) GetFormattedTimeString() string {
 	return fmt.Sprintf("%2d:%02d", t.TimeRemaining/60, t.TimeRemaining%60)
 }
 
-func (t PausedTimerState) tick() {}
+func (t PausedTimerState) Tick() {}
 
-func (t PausedTimerState) nextTimer() TimerState {
+func (t PausedTimerState) NextTimer() TimerState {
 	timerType, timerDuration, pomodoroCount := t.getNextTimerType()
 
 	return PausedTimerState{
@@ -95,15 +95,15 @@ func (t PausedTimerState) nextTimer() TimerState {
 	}
 }
 
-func (t PausedTimerState) pause() TimerState {
+func (t PausedTimerState) Pause() TimerState {
 	return RunningTimerState(t)
 }
 
-func (t PausedTimerState) skipCurrentTimer() TimerState {
-	return t.nextTimer()
+func (t PausedTimerState) SkipCurrentTimer() TimerState {
+	return t.NextTimer()
 }
 
-func (t PausedTimerState) resetCurrentTimer() TimerState {
+func (t PausedTimerState) ResetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
 			TimerType:     t.TimerType,
@@ -113,7 +113,7 @@ func (t PausedTimerState) resetCurrentTimer() TimerState {
 	}
 }
 
-func (t PausedTimerState) getFormattedTimeString() string {
+func (t PausedTimerState) GetFormattedTimeString() string {
 	return fmt.Sprintf("%2d:%02d    (paused)", t.TimeRemaining/60, t.TimeRemaining%60)
 }
 
