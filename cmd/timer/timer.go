@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+const TICKS_PER_SECOND = 100
+const TICKS_PER_MINUTE = TICKS_PER_SECOND * 60
+
 const (
 	FOCUS_TIMER = iota
 	SHORT_BREAK_TIMER
@@ -11,9 +14,9 @@ const (
 )
 
 var TimerDuration = map[int]int{
-	FOCUS_TIMER:       25 * 60,
-	SHORT_BREAK_TIMER: 5 * 60,
-	LONG_BREAK_TIMER:  15 * 60,
+	FOCUS_TIMER:       25 * 60 * TICKS_PER_SECOND,
+	SHORT_BREAK_TIMER: 5 * 60 * TICKS_PER_SECOND,
+	LONG_BREAK_TIMER:  15 * 60 * TICKS_PER_SECOND,
 }
 
 type TimerState interface {
@@ -78,7 +81,7 @@ func (t RunningTimerState) ResetCurrentTimer() TimerState {
 }
 
 func (t RunningTimerState) GetFormattedTimeString() string {
-	return fmt.Sprintf("#%d %2d:%02d", t.PomodoroCount, t.TimeRemaining/60, t.TimeRemaining%60)
+	return fmt.Sprintf("#%d %2d:%02d", t.PomodoroCount, t.TimeRemaining/TICKS_PER_MINUTE, (t.TimeRemaining%TICKS_PER_MINUTE)/TICKS_PER_SECOND)
 }
 
 func (t PausedTimerState) Tick() TimerState {
@@ -108,7 +111,7 @@ func (t PausedTimerState) ResetCurrentTimer() TimerState {
 }
 
 func (t PausedTimerState) GetFormattedTimeString() string {
-	return fmt.Sprintf("#%d %2d:%02d    (paused)", t.PomodoroCount, t.TimeRemaining/60, t.TimeRemaining%60)
+	return fmt.Sprintf("#%d %2d:%02d    (paused)", t.PomodoroCount, t.TimeRemaining/TICKS_PER_MINUTE, (t.TimeRemaining%TICKS_PER_MINUTE)/TICKS_PER_SECOND)
 }
 
 func (t BetweenTimerState) Tick() TimerState {

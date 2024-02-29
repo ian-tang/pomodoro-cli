@@ -68,7 +68,7 @@ func Execute() {
 	defer fmt.Print("\x1B[?25h" + "\r\x1B[3A\x1B[J")
 
 	timerState := timer.TimerState(initialTimerState)
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Second / timer.TICKS_PER_SECOND)
 
 	input := make(chan byte)
 
