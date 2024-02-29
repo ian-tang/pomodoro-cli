@@ -33,8 +33,22 @@ var initialTimerState = timer.PausedTimerState{
 	Timer: timer.Timer{
 		TimerType:     timer.FOCUS_TIMER,
 		TimeRemaining: timer.TimerDuration[timer.FOCUS_TIMER],
-		PomodoroCount: 0,
+		PomodoroCount: 1,
 	},
+}
+
+const (
+	LOWERCASE_S = iota
+	LOWERCASE_R
+	LOWERCASE_F
+	LOWERCASE_Q
+)
+
+var validInputKeys = map[byte]int{
+	's': LOWERCASE_S,
+	'r': LOWERCASE_R,
+	'f': LOWERCASE_F,
+	'q': LOWERCASE_Q,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -62,8 +76,8 @@ func Execute() {
 			fmt.Print("\r\x1B[0K", formattedTime)
 
 			select {
-			case <-input:
-				timerState = timerState.Pause()
+			case input := <-input:
+				timerState = handleUserInput(timerState, input)
 			case <-ticker.C:
 				timerState = timerState.Tick()
 			}
@@ -77,14 +91,12 @@ func Execute() {
 		if err != nil {
 			return
 		}
-
-		if buf[0] == 's' || buf[0] == 'S' {
-			input <- buf[0]
-		} else {
-			close(input)
+		if buf[0] == 'q' {
 			fmt.Print("\r\x1B[0K")
 			return
 		}
+		input <- buf[0]
+
 		time.Sleep(time.Millisecond)
 	}
 
@@ -100,4 +112,19 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func handleUserInput(t timer.TimerState, input byte) timer.TimerState {
+	inputKey := validInputKeys[input]
+
+	switch inputKey {
+	case LOWERCASE_S:
+		return t.Pause()
+	case LOWERCASE_F:
+		return t.SkipCurrentTimer()
+	case LOWERCASE_R:
+		return t.ResetCurrentTimer()
+	default:
+		return t
+	}
 }
