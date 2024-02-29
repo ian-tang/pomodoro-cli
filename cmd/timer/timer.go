@@ -83,7 +83,7 @@ func (t RunningTimerState) ResetCurrentTimer() TimerState {
 }
 
 func (t RunningTimerState) GetFormattedTimeString() string {
-	return fmt.Sprintf("%2d:%02d", t.TimeRemaining/60, t.TimeRemaining%60)
+	return fmt.Sprintf("#%d %2d:%02d", t.PomodoroCount, t.TimeRemaining/60, t.TimeRemaining%60)
 }
 
 func (t PausedTimerState) Tick() TimerState {
@@ -121,7 +121,7 @@ func (t PausedTimerState) ResetCurrentTimer() TimerState {
 }
 
 func (t PausedTimerState) GetFormattedTimeString() string {
-	return fmt.Sprintf("%2d:%02d    (paused)", t.TimeRemaining/60, t.TimeRemaining%60)
+	return fmt.Sprintf("#%d %2d:%02d    (paused)", t.PomodoroCount, t.TimeRemaining/60, t.TimeRemaining%60)
 }
 
 func (t Timer) getNextTimerType() (int, int, int) {
