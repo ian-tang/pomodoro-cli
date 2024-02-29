@@ -51,6 +51,8 @@ var validInputKeys = map[byte]int{
 	'q': LOWERCASE_Q,
 }
 
+const inputHelpMessage = "[s] start/stop [t] adjust timers [a] add task\n\r[r] reset current timer [R] reset progress [f] skip current timer\n\r[q] quit\r"
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -62,6 +64,8 @@ func Execute() {
 	}
 
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
+	// make cursor visible and clear screen of text
+	defer fmt.Print("\x1B[?25h" + "\r\x1B[3A\x1B[J")
 
 	timerState := timer.TimerState(initialTimerState)
 	ticker := time.NewTicker(time.Second)
@@ -70,10 +74,13 @@ func Execute() {
 
 	go func() {
 		var formattedTime string
+		// make cursor invisible and insert 3 new lines
+		fmt.Print("\x1B[?25l\n\n\n")
 
-		for ; ; fmt.Print("\r\x1B[0K") {
+		for {
 			formattedTime = timerState.GetFormattedTimeString()
-			fmt.Print("\r\x1B[0K", formattedTime)
+			// move cursor to left of screen and up 3 rows, then erase from cursor to end of screen
+			fmt.Print("\r\x1B[3A\x1B[J", formattedTime, "\n\r", inputHelpMessage)
 
 			select {
 			case input := <-input:
@@ -92,7 +99,6 @@ func Execute() {
 			return
 		}
 		if buf[0] == 'q' {
-			fmt.Print("\r\x1B[0K")
 			return
 		}
 		input <- buf[0]
