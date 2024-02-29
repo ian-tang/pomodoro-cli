@@ -51,9 +51,6 @@ func (t RunningTimerState) Tick() TimerState {
 
 func (t RunningTimerState) NextTimer() TimerState {
 	timerType, timerDuration, pomodoroCount := t.getNextTimerType()
-	if timerType == SHORT_BREAK_TIMER || timerType == LONG_BREAK_TIMER {
-		t.PomodoroCount++
-	}
 
 	return PausedTimerState{
 		Timer{
