@@ -4,6 +4,7 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -29,7 +30,7 @@ to quickly create a Cobra application.`,
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
-var initialTimerState = timer.PausedTimerState{
+var defaultTimerState = timer.PausedTimerState{
 	Timer: timer.Timer{
 		TimerType:     timer.FOCUS_TIMER,
 		TimeRemaining: timer.TimerDuration[timer.FOCUS_TIMER],
@@ -67,9 +68,24 @@ func Execute() {
 	// make cursor visible and clear screen of text
 	defer fmt.Print("\x1B[?25h" + "\r\x1B[3A\x1B[J")
 
-	timerState := timer.TimerState(initialTimerState)
-	ticker := time.NewTicker(time.Second / timer.TICKS_PER_SECOND)
+	var savedTimerState timer.Timer
+	var timerState timer.TimerState
+	saveFileName := "./data.json"
+	data, err := os.ReadFile(saveFileName)
+	if err != nil {
+		fmt.Println("Error opening saved session data: ", err)
+		timerState = defaultTimerState
+	} else {
+		marshalErr := json.Unmarshal(data, &savedTimerState)
+		if marshalErr != nil {
+			fmt.Println("Error marshalling JSON: ", marshalErr)
+			timerState = defaultTimerState
+		} else {
+			timerState = timer.PausedTimerState{Timer: savedTimerState}
+		}
+	}
 
+	ticker := time.NewTicker(time.Second / timer.TICKS_PER_SECOND)
 	input := make(chan byte)
 
 	go func() {
@@ -83,8 +99,17 @@ func Execute() {
 			fmt.Print("\r\x1B[3A\x1B[J", formattedTime, "\n\r", inputHelpMessage)
 
 			select {
-			case input := <-input:
-				timerState = handleUserInput(timerState, input)
+			case inputKey := <-input:
+				if inputKey == 'q' {
+					buf, err := json.MarshalIndent(timerState, "", "  ")
+					if err != nil {
+						fmt.Println("Error marshalling JSON: ", err)
+					}
+					os.WriteFile(saveFileName, buf, 0644)
+					input <- '0'
+				}
+
+				timerState = handleUserInput(timerState, inputKey)
 			case <-ticker.C:
 				timerState = timerState.Tick()
 			}
@@ -99,6 +124,8 @@ func Execute() {
 			return
 		}
 		if buf[0] == 'q' {
+			input <- buf[0]
+			<-input // wait for confirmation that shutdown procedure is complete
 			return
 		}
 		input <- buf[0]
