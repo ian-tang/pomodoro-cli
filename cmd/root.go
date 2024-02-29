@@ -121,7 +121,11 @@ func init() {
 }
 
 func handleUserInput(t timer.TimerState, input byte) timer.TimerState {
-	inputKey := validInputKeys[input]
+	inputKey, ok := validInputKeys[input]
+
+	if !ok {
+		return t
+	}
 
 	switch inputKey {
 	case LOWERCASE_S:
