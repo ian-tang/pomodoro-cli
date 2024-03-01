@@ -13,10 +13,22 @@ const (
 	LONG_BREAK_TIMER
 )
 
-var TimerDuration = map[int]int{
-	FOCUS_TIMER:       25 * 60 * TICKS_PER_SECOND,
-	SHORT_BREAK_TIMER: 5 * 60 * TICKS_PER_SECOND,
-	LONG_BREAK_TIMER:  15 * 60 * TICKS_PER_SECOND,
+const (
+	DEFAULT_FOCUS_TIMER_DURATION       = 25 * TICKS_PER_MINUTE
+	DEFAULT_SHORT_FOCUS_TIMER_DURATION = 5 * TICKS_PER_MINUTE
+	DEFAULT_LONG_BREAK_TIMER_DURATION  = 15 * TICKS_PER_MINUTE
+)
+
+var timerDuration = map[int]int{
+	FOCUS_TIMER:       DEFAULT_FOCUS_TIMER_DURATION,
+	SHORT_BREAK_TIMER: DEFAULT_SHORT_FOCUS_TIMER_DURATION,
+	LONG_BREAK_TIMER:  DEFAULT_LONG_BREAK_TIMER_DURATION,
+}
+
+type TimerDuration struct {
+	Focus      int
+	ShortBreak int
+	LongBreak  int
 }
 
 type TimerState interface {
@@ -26,6 +38,7 @@ type TimerState interface {
 	SkipCurrentTimer() TimerState
 	ResetCurrentTimer() TimerState
 	GetFormattedTimeString() string
+	GetCurrentTimerState() Timer
 }
 
 type Timer struct {
@@ -74,7 +87,7 @@ func (t RunningTimerState) ResetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
 			TimerType:     t.TimerType,
-			TimeRemaining: TimerDuration[t.TimerType],
+			TimeRemaining: timerDuration[t.TimerType],
 			PomodoroCount: t.PomodoroCount,
 		},
 	}
@@ -82,6 +95,10 @@ func (t RunningTimerState) ResetCurrentTimer() TimerState {
 
 func (t RunningTimerState) GetFormattedTimeString() string {
 	return fmt.Sprintf("#%d %2d:%02d", t.PomodoroCount, t.TimeRemaining/TICKS_PER_MINUTE, (t.TimeRemaining%TICKS_PER_MINUTE)/TICKS_PER_SECOND)
+}
+
+func (t RunningTimerState) GetCurrentTimerState() Timer {
+	return t.Timer
 }
 
 func (t PausedTimerState) Tick() TimerState {
@@ -104,7 +121,7 @@ func (t PausedTimerState) ResetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
 			TimerType:     t.TimerType,
-			TimeRemaining: TimerDuration[t.TimerType],
+			TimeRemaining: timerDuration[t.TimerType],
 			PomodoroCount: t.PomodoroCount,
 		},
 	}
@@ -112,6 +129,10 @@ func (t PausedTimerState) ResetCurrentTimer() TimerState {
 
 func (t PausedTimerState) GetFormattedTimeString() string {
 	return fmt.Sprintf("#%d %2d:%02d    (paused)", t.PomodoroCount, t.TimeRemaining/TICKS_PER_MINUTE, (t.TimeRemaining%TICKS_PER_MINUTE)/TICKS_PER_SECOND)
+}
+
+func (t PausedTimerState) GetCurrentTimerState() Timer {
+	return t.Timer
 }
 
 func (t BetweenTimerState) Tick() TimerState {
@@ -150,7 +171,7 @@ func (t BetweenTimerState) ResetCurrentTimer() TimerState {
 	return PausedTimerState{
 		Timer{
 			TimerType:     t.TimerType,
-			TimeRemaining: TimerDuration[t.TimerType],
+			TimeRemaining: timerDuration[t.TimerType],
 			PomodoroCount: t.PomodoroCount,
 		},
 	}
@@ -173,14 +194,34 @@ func (t BetweenTimerState) GetFormattedTimeString() string {
 	}
 }
 
+func (t BetweenTimerState) GetCurrentTimerState() Timer {
+	return t.Timer
+}
+
 func (t Timer) getNextTimerType() (int, int, int) {
 	if t.TimerType == FOCUS_TIMER && t.PomodoroCount%4 == 0 {
-		return LONG_BREAK_TIMER, TimerDuration[LONG_BREAK_TIMER], t.PomodoroCount
+		return LONG_BREAK_TIMER, timerDuration[LONG_BREAK_TIMER], t.PomodoroCount
 	}
 
 	if t.TimerType == FOCUS_TIMER {
-		return SHORT_BREAK_TIMER, TimerDuration[SHORT_BREAK_TIMER], t.PomodoroCount
+		return SHORT_BREAK_TIMER, timerDuration[SHORT_BREAK_TIMER], t.PomodoroCount
 	}
 
-	return FOCUS_TIMER, TimerDuration[FOCUS_TIMER], t.PomodoroCount + 1
+	return FOCUS_TIMER, timerDuration[FOCUS_TIMER], t.PomodoroCount + 1
+}
+
+func SetTimerDuration(timerType int, duration int) error {
+	if timerType > 2 {
+		return fmt.Errorf("invalid timer type: %v", timerType)
+	}
+	if duration <= 0 {
+		return fmt.Errorf("cannot set timer duration to %v", duration)
+	}
+
+	timerDuration[timerType] = duration * TICKS_PER_MINUTE
+	return nil
+}
+
+func GetTimerDurations() map[int]int {
+	return timerDuration
 }

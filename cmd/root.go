@@ -33,7 +33,7 @@ to quickly create a Cobra application.`,
 var defaultTimerState = timer.PausedTimerState{
 	Timer: timer.Timer{
 		TimerType:     timer.FOCUS_TIMER,
-		TimeRemaining: timer.TimerDuration[timer.FOCUS_TIMER],
+		TimeRemaining: timer.DEFAULT_FOCUS_TIMER_DURATION,
 		PomodoroCount: 1,
 	},
 }
@@ -54,6 +54,13 @@ var validInputKeys = map[byte]int{
 
 const inputHelpMessage = "[s] start/stop [t] adjust timers [a] add task\n\r[r] reset current timer [R] reset progress [f] skip current timer\n\r[q] quit\r"
 
+type TimerSave struct {
+	timer.Timer         `json:"Timer"`
+	timer.TimerDuration `json:"TimerDuration"`
+}
+
+var NIL_TIMER = timer.Timer{}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -68,20 +75,28 @@ func Execute() {
 	// make cursor visible and clear screen of text
 	defer fmt.Print("\x1B[?25h" + "\r\x1B[3A\x1B[J")
 
-	var savedTimerState timer.Timer
+	var timerSaveFile TimerSave
 	var timerState timer.TimerState
 	saveFileName := "./data.json"
+
 	data, err := os.ReadFile(saveFileName)
 	if err != nil {
 		fmt.Println("Error opening saved session data: ", err)
 		timerState = defaultTimerState
 	} else {
-		marshalErr := json.Unmarshal(data, &savedTimerState)
+		marshalErr := json.Unmarshal(data, &timerSaveFile)
 		if marshalErr != nil {
 			fmt.Println("Error marshalling JSON: ", marshalErr)
 			timerState = defaultTimerState
 		} else {
-			timerState = timer.PausedTimerState{Timer: savedTimerState}
+			if timerSaveFile.Timer != NIL_TIMER {
+				timerState = timer.PausedTimerState{Timer: timerSaveFile.Timer}
+			} else {
+				timerState = defaultTimerState
+			}
+			timer.SetTimerDuration(timer.FOCUS_TIMER, timerSaveFile.Focus)
+			timer.SetTimerDuration(timer.SHORT_BREAK_TIMER, timerSaveFile.ShortBreak)
+			timer.SetTimerDuration(timer.LONG_BREAK_TIMER, timerSaveFile.LongBreak)
 		}
 	}
 
@@ -101,7 +116,17 @@ func Execute() {
 			select {
 			case inputKey := <-input:
 				if inputKey == 'q' {
-					buf, err := json.MarshalIndent(timerState, "", "  ")
+					timerDurations := timer.GetTimerDurations()
+					saveTimerDurations := timer.TimerDuration{
+						Focus:      timerDurations[timer.FOCUS_TIMER] / timer.TICKS_PER_MINUTE,
+						ShortBreak: timerDurations[timer.SHORT_BREAK_TIMER] / timer.TICKS_PER_MINUTE,
+						LongBreak:  timerDurations[timer.LONG_BREAK_TIMER] / timer.TICKS_PER_MINUTE,
+					}
+
+					buf, err := json.MarshalIndent(TimerSave{
+						timerState.GetCurrentTimerState(),
+						saveTimerDurations,
+					}, "", "  ")
 					if err != nil {
 						fmt.Println("Error marshalling JSON: ", err)
 					}
