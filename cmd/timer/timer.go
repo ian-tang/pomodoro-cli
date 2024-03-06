@@ -32,13 +32,12 @@ type TimerDuration struct {
 }
 
 type TimerState interface {
-	Tick() TimerState
-	NextTimer() TimerState
-	Pause() TimerState
-	SkipCurrentTimer() TimerState
-	ResetCurrentTimer() TimerState
-	GetFormattedTimeString() string
-	GetCurrentTimerState() Timer
+	Tick(*Timer, *TimerState)
+	NextTimer(*Timer, *TimerState)
+	Pause(*Timer, *TimerState)
+	SkipCurrentTimer(*Timer, *TimerState)
+	ResetCurrentTimer(*Timer, *TimerState)
+	GetFormattedTimeString(*Timer) string
 }
 
 type Timer struct {
@@ -47,167 +46,123 @@ type Timer struct {
 	PomodoroCount int
 }
 
-type RunningTimerState struct {
-	Timer
+type RunningTimerState struct{}
+
+type PausedTimerState struct{}
+
+type BetweenTimerState struct{}
+
+type TimerStatePool struct {
+	Running RunningTimerState
+	Paused  PausedTimerState
+	Between BetweenTimerState
 }
 
-type PausedTimerState struct {
-	Timer
+var TSPool = TimerStatePool{
+	Running: RunningTimerState{},
+	Paused:  PausedTimerState{},
+	Between: BetweenTimerState{},
 }
 
-type BetweenTimerState struct {
-	Timer
-}
-
-func (t RunningTimerState) Tick() TimerState {
+func (rts RunningTimerState) Tick(t *Timer, ts *TimerState) {
 	t.TimeRemaining--
 
 	if t.TimeRemaining <= 0 {
-		return t.NextTimer()
-	}
-
-	return RunningTimerState{
-		t.Timer,
+		rts.NextTimer(t, ts)
 	}
 }
 
-func (t RunningTimerState) NextTimer() TimerState {
-	return BetweenTimerState(t)
+func (rts RunningTimerState) NextTimer(t *Timer, ts *TimerState) {
+	*ts = TSPool.Between
 }
 
-func (t RunningTimerState) Pause() TimerState {
-	return PausedTimerState(t)
+func (rts RunningTimerState) Pause(t *Timer, ts *TimerState) {
+	*ts = TSPool.Paused
 }
 
-func (t RunningTimerState) SkipCurrentTimer() TimerState {
-	return t.NextTimer()
+func (rts RunningTimerState) SkipCurrentTimer(t *Timer, ts *TimerState) {
+	rts.NextTimer(t, ts)
 }
 
-func (t RunningTimerState) ResetCurrentTimer() TimerState {
-	return PausedTimerState{
-		Timer{
-			TimerType:     t.TimerType,
-			TimeRemaining: timerDuration[t.TimerType],
-			PomodoroCount: t.PomodoroCount,
-		},
-	}
+func (rts RunningTimerState) ResetCurrentTimer(t *Timer, ts *TimerState) {
+	*ts = TSPool.Paused
+	resetTimerValues(t)
 }
 
-func (t RunningTimerState) GetFormattedTimeString() string {
+func (rts RunningTimerState) GetFormattedTimeString(t *Timer) string {
 	return fmt.Sprintf("#%d %2d:%02d", t.PomodoroCount, t.TimeRemaining/TICKS_PER_MINUTE, (t.TimeRemaining%TICKS_PER_MINUTE)/TICKS_PER_SECOND)
 }
 
-func (t RunningTimerState) GetCurrentTimerState() Timer {
-	return t.Timer
+func (pts PausedTimerState) Tick(t *Timer, ts *TimerState) {}
+
+func (pts PausedTimerState) NextTimer(t *Timer, ts *TimerState) {
+	*ts = TSPool.Between
 }
 
-func (t PausedTimerState) Tick() TimerState {
-	return t
+func (pts PausedTimerState) Pause(t *Timer, ts *TimerState) {
+	*ts = TSPool.Running
 }
 
-func (t PausedTimerState) NextTimer() TimerState {
-	return BetweenTimerState(t)
+func (pts PausedTimerState) SkipCurrentTimer(t *Timer, ts *TimerState) {
+	pts.NextTimer(t, ts)
 }
 
-func (t PausedTimerState) Pause() TimerState {
-	return RunningTimerState(t)
+func (pts PausedTimerState) ResetCurrentTimer(t *Timer, ts *TimerState) {
+	resetTimerValues(t)
 }
 
-func (t PausedTimerState) SkipCurrentTimer() TimerState {
-	return t.NextTimer()
-}
-
-func (t PausedTimerState) ResetCurrentTimer() TimerState {
-	return PausedTimerState{
-		Timer{
-			TimerType:     t.TimerType,
-			TimeRemaining: timerDuration[t.TimerType],
-			PomodoroCount: t.PomodoroCount,
-		},
-	}
-}
-
-func (t PausedTimerState) GetFormattedTimeString() string {
+func (pts PausedTimerState) GetFormattedTimeString(t *Timer) string {
 	return fmt.Sprintf("#%d %2d:%02d    (paused)", t.PomodoroCount, t.TimeRemaining/TICKS_PER_MINUTE, (t.TimeRemaining%TICKS_PER_MINUTE)/TICKS_PER_SECOND)
 }
 
-func (t PausedTimerState) GetCurrentTimerState() Timer {
-	return t.Timer
+func (bts BetweenTimerState) Tick(t *Timer, ts *TimerState) {}
+
+func (bts BetweenTimerState) NextTimer(t *Timer, ts *TimerState) {}
+
+func (bts BetweenTimerState) Pause(t *Timer, ts *TimerState) {
+	setNextTimerValues(t)
+	*ts = TSPool.Running
 }
 
-func (t BetweenTimerState) Tick() TimerState {
-	return t
+func (bts BetweenTimerState) SkipCurrentTimer(t *Timer, ts *TimerState) {}
+
+func (bts BetweenTimerState) ResetCurrentTimer(t *Timer, ts *TimerState) {
+	*ts = TSPool.Paused
+	resetTimerValues(t)
 }
 
-func (t BetweenTimerState) NextTimer() TimerState {
-	timerType, timerDuration, pomodoroCount := t.getNextTimerType()
-
-	return PausedTimerState{
-		Timer{
-			TimerType:     timerType,
-			TimeRemaining: timerDuration,
-			PomodoroCount: pomodoroCount,
-		},
-	}
-}
-
-func (t BetweenTimerState) Pause() TimerState {
-	timerType, timerDuration, pomodoroCount := t.getNextTimerType()
-
-	return RunningTimerState{
-		Timer{
-			TimerType:     timerType,
-			TimeRemaining: timerDuration,
-			PomodoroCount: pomodoroCount,
-		},
-	}
-}
-
-func (t BetweenTimerState) SkipCurrentTimer() TimerState {
-	return t
-}
-
-func (t BetweenTimerState) ResetCurrentTimer() TimerState {
-	return PausedTimerState{
-		Timer{
-			TimerType:     t.TimerType,
-			TimeRemaining: timerDuration[t.TimerType],
-			PomodoroCount: t.PomodoroCount,
-		},
-	}
-}
-
-func (t BetweenTimerState) GetFormattedTimeString() string {
-	timerType, _, pomodoroCount := t.getNextTimerType()
-
-	switch timerType {
-	case SHORT_BREAK_TIMER:
-		if pomodoroCount == 1 {
+func (bts BetweenTimerState) GetFormattedTimeString(t *Timer) string {
+	switch {
+	case t.TimerType == FOCUS_TIMER && t.PomodoroCount%4 == 0:
+		return fmt.Sprintf("%d pomodoros done! Start long break?", t.PomodoroCount)
+	case t.TimerType == FOCUS_TIMER:
+		if t.PomodoroCount == 1 {
 			return "1 pomodoro done! Start short break?"
 		}
 
 		return fmt.Sprintf("%d pomodoros done! Start short break?", t.PomodoroCount)
-	case LONG_BREAK_TIMER:
-		return fmt.Sprintf("%d pomodoros done! Start long break?", t.PomodoroCount)
 	default:
 		return "Break over! Start pomodoro?"
 	}
 }
 
-func (t BetweenTimerState) GetCurrentTimerState() Timer {
-	return t.Timer
+func resetTimerValues(t *Timer) {
+	t.TimeRemaining = timerDuration[t.TimerType]
 }
 
-func (t Timer) getNextTimerType() (int, int, int) {
-	if t.TimerType == FOCUS_TIMER && t.PomodoroCount%4 == 0 {
-		return LONG_BREAK_TIMER, timerDuration[LONG_BREAK_TIMER], t.PomodoroCount
+func setNextTimerValues(t *Timer) {
+	switch {
+	case t.TimerType == FOCUS_TIMER && t.PomodoroCount%4 == 0:
+		t.TimerType = LONG_BREAK_TIMER
+		t.TimeRemaining = timerDuration[LONG_BREAK_TIMER]
+	case t.TimerType == FOCUS_TIMER:
+		t.TimerType = SHORT_BREAK_TIMER
+		t.TimeRemaining = timerDuration[SHORT_BREAK_TIMER]
+	default:
+		t.TimerType = FOCUS_TIMER
+		t.TimeRemaining = timerDuration[FOCUS_TIMER]
+		t.PomodoroCount++
 	}
-
-	if t.TimerType == FOCUS_TIMER {
-		return SHORT_BREAK_TIMER, timerDuration[SHORT_BREAK_TIMER], t.PomodoroCount
-	}
-
-	return FOCUS_TIMER, timerDuration[FOCUS_TIMER], t.PomodoroCount + 1
 }
 
 func SetTimerDuration(timerType int, duration int) error {
