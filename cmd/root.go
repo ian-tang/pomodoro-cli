@@ -30,13 +30,12 @@ to quickly create a Cobra application.`,
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
-var defaultTimerState = timer.PausedTimerState{
-	Timer: timer.Timer{
-		TimerType:     timer.FOCUS_TIMER,
-		TimeRemaining: timer.DEFAULT_FOCUS_TIMER_DURATION,
-		PomodoroCount: 1,
-	},
+var defaultTimer = timer.Timer{
+	TimerType:     timer.FOCUS_TIMER,
+	TimeRemaining: timer.DEFAULT_FOCUS_TIMER_DURATION,
+	PomodoroCount: 1,
 }
+var defaultTimerState timer.TimerState = timer.TSPool.Paused
 
 const (
 	LOWERCASE_S = iota
@@ -76,29 +75,31 @@ func Execute() {
 	defer fmt.Print("\x1B[?25h" + "\r\x1B[3A\x1B[J")
 
 	var timerSaveFile TimerSave
-	var timerState timer.TimerState
+	t := defaultTimer
+	timerState := defaultTimerState
 	saveFileName := "./data.json"
 
-	data, err := os.ReadFile(saveFileName)
-	if err != nil {
-		fmt.Println("Error opening saved session data: ", err)
-		timerState = defaultTimerState
-	} else {
-		marshalErr := json.Unmarshal(data, &timerSaveFile)
-		if marshalErr != nil {
-			fmt.Println("Error marshalling JSON: ", marshalErr)
-			timerState = defaultTimerState
-		} else {
-			if timerSaveFile.Timer != NIL_TIMER {
-				timerState = timer.PausedTimerState{Timer: timerSaveFile.Timer}
-			} else {
-				timerState = defaultTimerState
-			}
-			timer.SetTimerDuration(timer.FOCUS_TIMER, timerSaveFile.Focus)
-			timer.SetTimerDuration(timer.SHORT_BREAK_TIMER, timerSaveFile.ShortBreak)
-			timer.SetTimerDuration(timer.LONG_BREAK_TIMER, timerSaveFile.LongBreak)
+	func() {
+		var data []byte
+		var err error
+		data, err = os.ReadFile(saveFileName)
+		if err != nil {
+			fmt.Println("Error opening saved session data:", err)
+			return
 		}
-	}
+		err = json.Unmarshal(data, &timerSaveFile)
+		if err != nil {
+			fmt.Println("Error marshalling JSON:", err)
+			return
+		}
+		if timerSaveFile.Timer != NIL_TIMER {
+			t = timerSaveFile.Timer
+			timerState = timer.TSPool.Paused
+		}
+		timer.SetTimerDuration(timer.FOCUS_TIMER, timerSaveFile.Focus)
+		timer.SetTimerDuration(timer.SHORT_BREAK_TIMER, timerSaveFile.ShortBreak)
+		timer.SetTimerDuration(timer.LONG_BREAK_TIMER, timerSaveFile.LongBreak)
+	}()
 
 	ticker := time.NewTicker(time.Second / timer.TICKS_PER_SECOND)
 	input := make(chan byte)
@@ -109,7 +110,7 @@ func Execute() {
 		fmt.Print("\x1B[?25l\n\n\n")
 
 		for {
-			formattedTime = timerState.GetFormattedTimeString()
+			formattedTime = timerState.GetFormattedTimeString(&t)
 			// move cursor to left of screen and up 3 rows, then erase from cursor to end of screen
 			fmt.Print("\r\x1B[3A\x1B[J", formattedTime, "\n\r", inputHelpMessage)
 
@@ -124,19 +125,19 @@ func Execute() {
 					}
 
 					buf, err := json.MarshalIndent(TimerSave{
-						timerState.GetCurrentTimerState(),
+						t,
 						saveTimerDurations,
 					}, "", "  ")
 					if err != nil {
-						fmt.Println("Error marshalling JSON: ", err)
+						fmt.Println("Error marshalling JSON:", err)
 					}
 					os.WriteFile(saveFileName, buf, 0644)
 					input <- '0'
 				}
 
-				timerState = handleUserInput(timerState, inputKey)
+				handleUserInput(&t, &timerState, inputKey)
 			case <-ticker.C:
-				timerState = timerState.Tick()
+				timerState.Tick(&t, &timerState)
 			}
 		}
 	}()
@@ -172,21 +173,21 @@ func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func handleUserInput(t timer.TimerState, input byte) timer.TimerState {
+func handleUserInput(t *timer.Timer, ts *timer.TimerState, input byte) {
 	inputKey, ok := validInputKeys[input]
 
 	if !ok {
-		return t
+		return
 	}
 
 	switch inputKey {
 	case LOWERCASE_S:
-		return t.Pause()
+		(*ts).Pause(t, ts)
 	case LOWERCASE_F:
-		return t.SkipCurrentTimer()
+		(*ts).SkipCurrentTimer(t, ts)
 	case LOWERCASE_R:
-		return t.ResetCurrentTimer()
+		(*ts).ResetCurrentTimer(t, ts)
 	default:
-		return t
+		return
 	}
 }
